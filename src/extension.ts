@@ -147,6 +147,24 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const disp = registerInspectorView(DAPTrackQueue, adapterDescriptorFactory);
 	context.subscriptions.concat(disp);
+
+	context.subscriptions.push(
+		vscode.debug.onDidReceiveDebugSessionCustomEvent((e: any) => {
+			switch (e.event) {
+				case "attachSingleSocket":
+					vscode.debug.startDebugging(
+						e.session.workspaceFolder,
+						{
+							type: "rdbg",
+							name: e.body.name,
+							request: "attach",
+							debugPort: e.body.socketPath,
+						} as AttachConfiguration,
+						e.session,
+					);
+			}
+		}),
+	);
 }
 
 export function deactivate() {
@@ -262,6 +280,34 @@ class StopDebugAdapter implements vscode.DebugAdapter {
 	}
 
 	dispose() {
+	}
+}
+
+class MultiSessionDebugAdapter implements vscode.DebugAdapter {
+	private sockPaths: Array<string> = [];
+	private sendMessage = new vscode.EventEmitter<vscode.DebugProtocolMessage>();
+	readonly onDidSendMessage: vscode.Event<any> = this.sendMessage.event;
+
+	constructor(sockPaths: Array<string>) {
+		this.sockPaths = sockPaths;
+	}
+
+	handleMessage(message: any): void {
+		if (message.type === "request" && message.command === "initialize") {
+			for (const [index, socketPath] of this.sockPaths.entries()) {
+				const name = socketPath.split("/").pop();
+				this.sendMessage.fire({
+					type: "event",
+					seq: index,
+					event: "attachSingleSocket",
+					body: { name, socketPath },
+				});
+			}
+		}
+	}
+
+	dispose() {
+		// Nothing to do
 	}
 }
 
@@ -472,13 +518,17 @@ class RdbgAdapterDescriptorFactory implements DebugAdapterDescriptorFactory, Ver
 					sockPath = list[0];
 					break;
 				default:
-					const sock = await vscode.window.showQuickPick(list);
-					if (sock) {
-						sockPath = sock;
-					}
-					else {
-						return new DebugAdapterInlineImplementation(new StopDebugAdapter);
-					}
+					// const sock = await vscode.window.showQuickPick(list);
+					// if (sock) {
+					// 	sockPath = sock;
+					// }
+					// else {
+					// 	return new DebugAdapterInlineImplementation(new StopDebugAdapter);
+					// }
+
+					// TODO: support attach multiple socket via enviroment variable
+					const adapter = new MultiSessionDebugAdapter(list);
+                    return new DebugAdapterInlineImplementation(adapter);
 			}
 		}
 
