@@ -1,9 +1,9 @@
 {
 	"name": "vscode-rdbg",
-	"displayName": "VSCode rdbg Ruby Debugger",
+	"displayName": "VSCode rdbg Ruby Debugger - Intercom Fork",
 	"description": "Ruby's rdbg debugger support for VSCode",
-	"publisher": "KoichiSasada",
-	"version": "0.2.2",
+	"publisher": "IkhsanIntercom",
+	"version": "0.2.2-intercom",
 	"license": "MIT",
 	"icon": "icon.png",
 	"author": {
